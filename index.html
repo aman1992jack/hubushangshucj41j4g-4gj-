@@ -523,7 +523,7 @@ const FXR={USD:32.5,JPY:0.218,EUR:35.8,GBP:41.5,CNY:4.48,KRW:0.024,HKD:4.17,SGD:
 // FX live rate cells in 公式 sheet: F2=USD, F3=JPY, F4=KRW, F5=CNY, F6=HKD, F7=EUR, F8=THB, F9=VND
 const FX_CELLS={USD:'F2',JPY:'F3',KRW:'F4',CNY:'F5',HKD:'F6',EUR:'F7',THB:'F8',VND:'F9'};
 const S={
-  pin:localStorage.getItem('czg_pin')||'1234',
+  pin:localStorage.getItem('czg_pin')||'355218',
   buf:'',
   gsId:localStorage.getItem('czg_gsid')||'1FUhXesSModk6yJmjZ34Jn2eklwmNJPpfKkAxrwefyS4',
   gsKey:localStorage.getItem('czg_gskey')||'',
@@ -545,7 +545,7 @@ const S={
     {cur:'THB',amt:19,rateBuy:0.94,rateLive:null}
   ],
   crypto:JSON.parse(localStorage.getItem('czg_cr')||'[]'),
-  intl:JSON.parse(localStorage.getItem('czg_intl')||'[]'),
+  intl:JSON.parse(localStorage.getItem('czg_intl')||'0')||[],
   other:JSON.parse(localStorage.getItem('czg_oth')||'[]'),
   emergency:JSON.parse(localStorage.getItem('czg_em')||JSON.stringify({balance:0,log:[],lastAutoDate:''})),
   expenses:[],
@@ -1246,6 +1246,19 @@ function emAdjust(type){
 function renderAll(){renderTW();renderUS();renderFX();renderCrypto();renderIntl();renderOther();renderExp();renderEM();updateTotal();}
 function refreshAll(){checkEmergencyAutoTopup();if(S.gsOk)pullAll();else renderAll();}
 function initApp(){
+  // ── 一次性資料清理（只執行一次，之後不再干涉）──
+  if(!localStorage.getItem('czg_cleaned_v1')){
+    S.intl=S.intl.filter(x=>x.code!=='YG');
+    localStorage.setItem('czg_intl',JSON.stringify(S.intl));
+    if(localStorage.getItem('czg_pin')==='1234'){
+      S.pin='355218';
+      localStorage.setItem('czg_pin','355218');
+    }
+    const msft=S.usStocks.find(x=>x.ticker==='MSFT');
+    if(msft&&msft.costTwd===13057){msft.costTwd=6528.5;saveL();}
+    localStorage.setItem('czg_cleaned_v1','1');
+  }
+  // ────────────────────────────────────────────
   document.getElementById('gs-id').value=S.gsId;
   document.getElementById('gs-key').value=S.gsKey;
   document.getElementById('cfg-sheet').value=S.cfg.sheet;
@@ -1255,7 +1268,6 @@ function initApp(){
   document.getElementById('cfg-msft').value=S.cfg.cells['MSFT'];
   document.getElementById('cfg-usdtwd').value=S.cfg.cells['USDTWD']||'F2';
   document.getElementById('cfg-cf').value=S.cfg.cfSheet;
-  // Set cashflow as default active pane (no overview in nav)
   document.querySelectorAll('.pane').forEach(p=>{p.classList.remove('on');p.style.display='';});
   document.getElementById('pane-overview').style.display='none';
   document.getElementById('pane-cashflow').classList.add('on');
