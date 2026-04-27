@@ -850,45 +850,285 @@ function renderExp(){
   el.innerHTML=[...S.expenses].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,60).map(e=>`<div class="cf-row"><div class="cf-l"><div class="cdot" style="background:${CATC[e.cat]||'#6B6A65'}"></div><div><div class="cn">${e.name}</div><div class="cm">${e.cat} · ${e.date}</div></div></div><div class="ca ${e.amt<0?'dn':'up'}">${e.amt<0?'-':'+'} NT$ ${fmt(Math.abs(e.amt))}</div></div>`).join('');
 }
 
-const MBODIES={
-  tw:`<div class="fr"><label class="fl">股票代號</label><input class="fi" id="i0" placeholder="例：2454"></div><div class="fr"><label class="fl">股票名稱</label><input class="fi" id="i1"></div><div class="fr"><label class="fl">持股數量（股）</label><input class="fi" id="i2" type="number"></div><div class="fr"><label class="fl">買入成本（每股台幣）</label><input class="fi" id="i3" type="number" step="0.01"></div><div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${new Date().toISOString().split('T')[0]}"></div><div class="fr"><label class="fl">類型</label><select class="fi" id="i6"><option value="buy">買入</option><option value="sell">賣出</option></select></div>`,
-  us:`<div class="fr"><label class="fl">股票代碼</label><input class="fi" id="i0" placeholder="例：AAPL"></div><div class="fr"><label class="fl">名稱</label><input class="fi" id="i1"></div><div class="fr"><label class="fl">持股（可小數）</label><input class="fi" id="i2" type="number" step="0.001"></div><div class="fr"><label class="fl">買入成本（每股台幣換算）</label><input class="fi" id="i3" type="number"></div><div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${new Date().toISOString().split('T')[0]}"></div>`,
-  fx:`<div class="fr"><label class="fl">幣種</label><select class="fi" id="i0"><option>USD</option><option>JPY</option><option>EUR</option><option>GBP</option><option>CNY</option><option>KRW</option><option>HKD</option><option>SGD</option><option>AUD</option><option>CAD</option></select></div><div class="fr"><label class="fl">持有數量</label><input class="fi" id="i1" type="number" step="0.01"></div><div class="fr"><label class="fl">買入匯率（兌台幣）</label><input class="fi" id="i2" type="number" step="0.01"></div>`,
-  crypto:`<div class="fr"><label class="fl">幣種代號</label><input class="fi" id="i0" placeholder="BTC、ETH"></div><div class="fr"><label class="fl">持有數量</label><input class="fi" id="i1" type="number" step="0.00001"></div><div class="fr"><label class="fl">買入總成本（台幣）</label><input class="fi" id="i2" type="number"></div>`,
-  intl:`<div class="fr"><label class="fl">代號</label><input class="fi" id="i0"></div><div class="fr"><label class="fl">名稱</label><input class="fi" id="i1"></div><div class="fr"><label class="fl">市場</label><select class="fi" id="i4"><option>韓股</option><option>日股</option><option>港股</option><option>A股</option><option>英股</option><option>德股</option><option>其他</option></select></div><div class="fr"><label class="fl">持股</label><input class="fi" id="i2" type="number"></div><div class="fr"><label class="fl">成本（每股台幣換算）</label><input class="fi" id="i3" type="number"></div>`,
-  other:`<div class="fr"><label class="fl">資產名稱</label><input class="fi" id="i0"></div><div class="fr"><label class="fl">估計價值（台幣）</label><input class="fi" id="i1" type="number"></div><div class="fr"><label class="fl">備註</label><input class="fi" id="i2"></div>`
+// ── 台股代號 → 名稱 查詢 ──────────────────────────────────
+const TW_NAMES = {
+  '0050':'元大0050','0056':'元大高股息','006208':'富邦台50','00878':'國泰永續高股息',
+  '00929':'復華台灣科技優息','00919':'群益台灣精選高息','2330':'台積電','2317':'鴻海',
+  '2454':'聯發科','2382':'廣達','2412':'中華電','2308':'台達電','2303':'聯電',
+  '2881':'富邦金','2882':'國泰金','2886':'兆豐金','2884':'玉山金','2891':'中信金',
+  '2892':'第一金','2880':'華南金','2883':'開發金','2885':'元大金','2887':'台新金',
+  '2888':'新光金','2890':'永豐金','1301':'台塑','1303':'南亞','1326':'台化',
+  '6505':'台塑化','2002':'中鋼','1216':'統一','2912':'統一超','2207':'和泰車',
+  '3008':'大立光','2395':'研華','2379':'瑞昱','2408':'南亞科','3711':'日月光投控',
+  '2357':'華碩','2353':'宏碁','2327':'國巨','4904':'遠傳','3045':'台灣大',
+  '2618':'長榮航','2603':'長榮','2609':'陽明','2615':'萬海','5880':'合庫金',
+  '2823':'中壽','2801':'彰銀','1101':'台泥','1102':'亞泥','9910':'豐泰',
 };
-const MTITLES={tw:'新增台股持倉',us:'新增美股持倉',fx:'新增外幣',crypto:'新增加密貨幣',intl:'新增他國股票',other:'新增其他資產'};
-function showM(t){S.curM=t;document.getElementById('mt').textContent=MTITLES[t]||'新增';document.getElementById('mb').innerHTML=MBODIES[t]||'';document.getElementById('ov').classList.add('on');}
+function lookupTWName(code) { return TW_NAMES[code.trim()] || ''; }
+
+// 台股彈窗 — 輸入代號後自動帶入名稱
+function buildTWModal() {
+  const today = new Date().toISOString().split('T')[0];
+  return `
+<div class="fr">
+  <label class="fl">股票代號</label>
+  <input class="fi" id="i0" placeholder="例：2330" oninput="onTWCodeInput(this.value)">
+</div>
+<div class="fr">
+  <label class="fl">股票名稱（輸入代號後自動帶入）</label>
+  <input class="fi" id="i1" placeholder="自動帶入或手動輸入">
+</div>
+<div class="fr">
+  <label class="fl">交易類型</label>
+  <select class="fi" id="i6" onchange="onTWActionChange(this.value)">
+    <option value="buy">買入</option>
+    <option value="sell">賣出</option>
+  </select>
+</div>
+<div class="fr">
+  <label class="fl">股票類型</label>
+  <select class="fi" id="i7" onchange="onTWUnitChange(this.value)">
+    <option value="lot">整股（張）</option>
+    <option value="odd">零股（股）</option>
+  </select>
+</div>
+<div class="fr">
+  <label class="fl" id="lbl-i2">數量（張，1張＝1000股）</label>
+  <input class="fi" id="i2" type="number" min="0" step="1" placeholder="0">
+</div>
+<div class="fr">
+  <label class="fl" id="lbl-i3">每股成交價（台幣）</label>
+  <input class="fi" id="i3" type="number" min="0" step="0.01" placeholder="0.00">
+</div>
+<div class="fr">
+  <label class="fl">交易日期</label>
+  <input class="fi" id="i5" type="date" value="${today}">
+</div>
+<div style="background:var(--surf2);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--tx2);margin-top:4px" id="tw-calc-hint"></div>`;
+}
+
+function onTWCodeInput(code) {
+  const name = lookupTWName(code);
+  const nameEl = document.getElementById('i1');
+  if (nameEl && name) nameEl.value = name;
+  updateTWCalcHint();
+}
+function onTWUnitChange(val) {
+  const lbl = document.getElementById('lbl-i2');
+  if (lbl) lbl.textContent = val === 'lot' ? '數量（張，1張＝1000股）' : '數量（股）';
+  updateTWCalcHint();
+}
+function onTWActionChange() { updateTWCalcHint(); }
+function updateTWCalcHint() {
+  const hint = document.getElementById('tw-calc-hint'); if (!hint) return;
+  const unit = gv('i7'), qty = parseFloat(gv('i2')) || 0, price = parseFloat(gv('i3')) || 0;
+  const shares = unit === 'lot' ? qty * 1000 : qty;
+  const total = shares * price;
+  const action = gv('i6') === 'sell' ? '賣出' : '買入';
+  if (shares > 0 && price > 0)
+    hint.textContent = `${action} ${shares.toLocaleString()} 股，總金額 NT$ ${fmt(total)}`;
+  else hint.textContent = '';
+}
+
+// 美股彈窗
+function buildUSModal() {
+  const today = new Date().toISOString().split('T')[0];
+  return `
+<div class="fr"><label class="fl">股票代碼</label><input class="fi" id="i0" placeholder="例：AAPL"></div>
+<div class="fr"><label class="fl">名稱</label><input class="fi" id="i1" placeholder="例：蘋果"></div>
+<div class="fr">
+  <label class="fl">交易類型</label>
+  <select class="fi" id="i6"><option value="buy">買入</option><option value="sell">賣出</option></select>
+</div>
+<div class="fr"><label class="fl">股數（可小數）</label><input class="fi" id="i2" type="number" step="0.001" min="0" placeholder="0"></div>
+<div class="fr"><label class="fl">每股成交價（台幣換算）</label><input class="fi" id="i3" type="number" min="0" placeholder="0"></div>
+<div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${today}"></div>`;
+}
+
+// 他國股票彈窗
+function buildIntlModal() {
+  const today = new Date().toISOString().split('T')[0];
+  return `
+<div class="fr"><label class="fl">股票代號</label><input class="fi" id="i0"></div>
+<div class="fr"><label class="fl">股票名稱</label><input class="fi" id="i1"></div>
+<div class="fr"><label class="fl">市場</label><select class="fi" id="i4"><option>韓股</option><option>日股</option><option>港股</option><option>A股</option><option>英股</option><option>德股</option><option>其他</option></select></div>
+<div class="fr"><label class="fl">交易類型</label><select class="fi" id="i6"><option value="buy">買入</option><option value="sell">賣出</option></select></div>
+<div class="fr"><label class="fl">股數</label><input class="fi" id="i2" type="number" min="0" step="0.001" placeholder="0"></div>
+<div class="fr"><label class="fl">每股成交價（台幣換算）</label><input class="fi" id="i3" type="number" min="0" placeholder="0"></div>
+<div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${today}"></div>`;
+}
+
+// 外幣彈窗
+function buildFXModal() {
+  const today = new Date().toISOString().split('T')[0];
+  return `
+<div class="fr"><label class="fl">幣種</label><select class="fi" id="i0"><option>USD</option><option>JPY</option><option>EUR</option><option>GBP</option><option>CNY</option><option>KRW</option><option>HKD</option><option>SGD</option><option>AUD</option><option>CAD</option><option>THB</option><option>VND</option></select></div>
+<div class="fr"><label class="fl">交易類型</label><select class="fi" id="i6"><option value="buy">買入（換匯）</option><option value="sell">賣出（換回台幣）</option></select></div>
+<div class="fr"><label class="fl">數量</label><input class="fi" id="i1" type="number" step="0.01" min="0" placeholder="0"></div>
+<div class="fr"><label class="fl">匯率（兌台幣）</label><input class="fi" id="i2" type="number" step="0.0001" min="0" placeholder="0.00"></div>
+<div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${today}"></div>`;
+}
+
+// 加密貨幣彈窗
+function buildCryptoModal() {
+  const today = new Date().toISOString().split('T')[0];
+  return `
+<div class="fr"><label class="fl">幣種代號</label><input class="fi" id="i0" placeholder="BTC、ETH、SOL"></div>
+<div class="fr"><label class="fl">交易類型</label><select class="fi" id="i6"><option value="buy">買入</option><option value="sell">賣出</option></select></div>
+<div class="fr"><label class="fl">數量</label><input class="fi" id="i1" type="number" step="0.00001" min="0" placeholder="0"></div>
+<div class="fr"><label class="fl">成交總金額（台幣）</label><input class="fi" id="i2" type="number" min="0" placeholder="0"></div>
+<div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${today}"></div>`;
+}
+
+const MTITLES={tw:'台股交易',us:'美股交易',fx:'外幣交易',crypto:'加密貨幣交易',intl:'他國股票交易',other:'新增其他資產'};
+
+function showM(t) {
+  S.curM = t;
+  document.getElementById('mt').textContent = MTITLES[t] || '新增';
+  let body = '';
+  if (t==='tw') body = buildTWModal();
+  else if (t==='us') body = buildUSModal();
+  else if (t==='intl') body = buildIntlModal();
+  else if (t==='fx') body = buildFXModal();
+  else if (t==='crypto') body = buildCryptoModal();
+  else if (t==='other') body = `<div class="fr"><label class="fl">資產名稱</label><input class="fi" id="i0"></div><div class="fr"><label class="fl">估計價值（台幣）</label><input class="fi" id="i1" type="number"></div><div class="fr"><label class="fl">備註</label><input class="fi" id="i2"></div>`;
+  document.getElementById('mb').innerHTML = body;
+  document.getElementById('ov').classList.add('on');
+}
 function closeM(){document.getElementById('ov').classList.remove('on');}
 function gv(id){const e=document.getElementById(id);return e?e.value:'';}
+
 function saveM(){
-  const t=S.curM;
-  if(t==='tw'){
-    const code=gv('i0'),name=gv('i1'),shares=parseFloat(gv('i2'))||0,cost=parseFloat(gv('i3'))||0;
-    const date=gv('i5')||new Date().toISOString().split('T')[0];
-    const action=gv('i6')||'buy';
-    const exist=S.twStocks.find(x=>x.code===code);
-    if(exist&&action==='buy'){exist.shares+=shares;exist.cost=(exist.cost*exist.shares+cost*shares)/(exist.shares);}
-    else if(!exist&&action==='buy')S.twStocks.push({code,name,shares,cost,livePrice:null,realPnl:0});
-    if(!S.txHistory)S.txHistory=[];
-    S.txHistory.push({cat:'tw',code,name,shares,price:cost,action,date});
-    localStorage.setItem('czg_txhist',JSON.stringify(S.txHistory));
+  const t = S.curM;
+  const date = gv('i5') || new Date().toISOString().split('T')[0];
+  const action = gv('i6') || 'buy';
+  if (!S.txHistory) S.txHistory = [];
+
+  if (t === 'tw') {
+    const code = gv('i0').trim(), name = gv('i1').trim() || lookupTWName(code) || code;
+    const unit = gv('i7') || 'lot';
+    const qtyRaw = parseFloat(gv('i2')) || 0;
+    const shares = unit === 'lot' ? qtyRaw * 1000 : qtyRaw;
+    const price = parseFloat(gv('i3')) || 0;
+    if (!code || shares <= 0 || price <= 0) { alert('請填寫代號、數量和成交價'); return; }
+
+    const exist = S.twStocks.find(x => x.code === code);
+    if (action === 'buy') {
+      if (exist) {
+        const oldTotal = exist.shares * exist.cost;
+        exist.shares = Math.round((exist.shares + shares) * 10000) / 10000;
+        exist.cost = (oldTotal + shares * price) / exist.shares;
+        exist.cost = Math.round(exist.cost * 10000) / 10000;
+      } else {
+        S.twStocks.push({code, name, shares, cost: price, livePrice: null, realPnl: 0});
+      }
+    } else { // sell
+      if (exist) {
+        const pnl = shares * (price - exist.cost);
+        exist.realPnl = (exist.realPnl || 0) + pnl;
+        exist.shares = Math.round((exist.shares - shares) * 10000) / 10000;
+        if (exist.shares <= 0) S.twStocks = S.twStocks.filter(x => x.code !== code);
+      }
+    }
+    S.txHistory.push({cat:'tw', code, name, shares, unit, price, action, date});
   }
-  else if(t==='us'){
-    const ticker=gv('i0'),name=gv('i1'),shares=parseFloat(gv('i2'))||0,costTwd=parseFloat(gv('i3'))||0;
-    const date=gv('i5')||new Date().toISOString().split('T')[0];
-    const exist=S.usStocks.find(x=>x.ticker===ticker);
-    if(exist)exist.shares+=shares; else S.usStocks.push({ticker,name,shares,costTwd,livePriceUsd:null});
-    if(!S.txHistory)S.txHistory=[];
-    S.txHistory.push({cat:'us',ticker,name,shares,price:costTwd,action:'buy',date});
-    localStorage.setItem('czg_txhist',JSON.stringify(S.txHistory));
+
+  else if (t === 'us') {
+    const ticker = gv('i0').trim().toUpperCase(), name = gv('i1').trim() || ticker;
+    const shares = parseFloat(gv('i2')) || 0;
+    const price = parseFloat(gv('i3')) || 0;
+    if (!ticker || shares <= 0 || price <= 0) { alert('請填寫代碼、股數和成交價'); return; }
+
+    const exist = S.usStocks.find(x => x.ticker === ticker);
+    if (action === 'buy') {
+      if (exist) {
+        const oldTotal = exist.shares * exist.costTwd;
+        exist.shares = Math.round((exist.shares + shares) * 10000) / 10000;
+        exist.costTwd = (oldTotal + shares * price) / exist.shares;
+        exist.costTwd = Math.round(exist.costTwd * 100) / 100;
+      } else {
+        S.usStocks.push({ticker, name, shares, costTwd: price, livePriceUsd: null});
+      }
+    } else { // sell
+      if (exist) {
+        exist.shares = Math.round((exist.shares - shares) * 10000) / 10000;
+        if (exist.shares <= 0) S.usStocks = S.usStocks.filter(x => x.ticker !== ticker);
+      }
+    }
+    S.txHistory.push({cat:'us', ticker, name, shares, price, action, date});
   }
-  else if(t==='fx')S.fx.push({cur:gv('i0'),amt:parseFloat(gv('i1'))||0,rateBuy:parseFloat(gv('i2'))||0,rateLive:null});
-  else if(t==='crypto'){const tot=parseFloat(gv('i2'))||0,amt=parseFloat(gv('i1'))||1;S.crypto.push({coin:gv('i0').toUpperCase(),amt,costPer:tot/amt,priceTwd:null});}
-  else if(t==='intl')S.intl.push({code:gv('i0'),name:gv('i1'),mkt:gv('i4'),shares:parseFloat(gv('i2'))||0,costTwd:parseFloat(gv('i3'))||0,priceTwd:null});
-  else if(t==='other')S.other.push({name:gv('i0'),val:parseFloat(gv('i1'))||0,note:gv('i2')});
-  saveL();closeM();renderAll();
+
+  else if (t === 'intl') {
+    const code = gv('i0').trim(), name = gv('i1').trim() || code, mkt = gv('i4');
+    const shares = parseFloat(gv('i2')) || 0;
+    const price = parseFloat(gv('i3')) || 0;
+    if (!code || shares <= 0 || price <= 0) { alert('請填寫代號、股數和成交價'); return; }
+
+    const exist = S.intl.find(x => x.code === code);
+    if (action === 'buy') {
+      if (exist) {
+        const oldTotal = exist.shares * exist.costTwd;
+        exist.shares = Math.round((exist.shares + shares) * 10000) / 10000;
+        exist.costTwd = (oldTotal + shares * price) / exist.shares;
+      } else {
+        S.intl.push({code, name, mkt, shares, costTwd: price, priceTwd: null});
+      }
+    } else {
+      if (exist) {
+        exist.shares = Math.round((exist.shares - shares) * 10000) / 10000;
+        if (exist.shares <= 0) S.intl = S.intl.filter(x => x.code !== code);
+      }
+    }
+    S.txHistory.push({cat:'intl', code, name, mkt, shares, price, action, date});
+  }
+
+  else if (t === 'fx') {
+    const cur = gv('i0'), amt = parseFloat(gv('i1')) || 0, rate = parseFloat(gv('i2')) || 0;
+    if (!cur || amt <= 0 || rate <= 0) { alert('請填寫數量和匯率'); return; }
+
+    const exist = S.fx.find(x => x.cur === cur);
+    if (action === 'buy') {
+      if (exist) exist.amt = Math.round((exist.amt + amt) * 10000) / 10000;
+      else S.fx.push({cur, amt, rateBuy: rate, rateLive: null});
+    } else {
+      if (exist) {
+        exist.amt = Math.round((exist.amt - amt) * 10000) / 10000;
+        if (exist.amt <= 0) S.fx = S.fx.filter(x => x.cur !== cur);
+      }
+    }
+    S.txHistory.push({cat:'fx', cur, amt, rate, action, date});
+  }
+
+  else if (t === 'crypto') {
+    const coin = gv('i0').trim().toUpperCase(), amt = parseFloat(gv('i1')) || 0;
+    const total = parseFloat(gv('i2')) || 0;
+    const costPer = amt > 0 ? total / amt : 0;
+    if (!coin || amt <= 0 || total <= 0) { alert('請填寫幣種、數量和金額'); return; }
+
+    const exist = S.crypto.find(x => x.coin === coin);
+    if (action === 'buy') {
+      if (exist) {
+        const oldTotal = exist.amt * exist.costPer;
+        exist.amt = Math.round((exist.amt + amt) * 1e8) / 1e8;
+        exist.costPer = (oldTotal + total) / exist.amt;
+      } else {
+        S.crypto.push({coin, amt, costPer, priceTwd: null});
+      }
+    } else {
+      if (exist) {
+        exist.amt = Math.round((exist.amt - amt) * 1e8) / 1e8;
+        if (exist.amt <= 0) S.crypto = S.crypto.filter(x => x.coin !== coin);
+      }
+    }
+    S.txHistory.push({cat:'crypto', coin, amt, costPer, action, date});
+  }
+
+  else if (t === 'other') {
+    S.other.push({name: gv('i0'), val: parseFloat(gv('i1')) || 0, note: gv('i2')});
+  }
+
+  localStorage.setItem('czg_txhist', JSON.stringify(S.txHistory));
+  saveL(); closeM(); renderAll();
 }
 function chgPin(){const np=document.getElementById('new-pin').value;if(!/^\d{4}$/.test(np)){document.getElementById('pin-note').textContent='必須是 4 位數字';return;}S.pin=np;localStorage.setItem('czg_pin',np);document.getElementById('pin-note').textContent='已更新';document.getElementById('new-pin').value='';}
 
