@@ -554,6 +554,13 @@ const S={
   dchart:null,tchart:null,stkPie:null,
   curM:null,trendYr:1,chartMode:'pie'
 };
+// ── PIN 碼強制重置（頁面載入時立即執行，不需要登入）──
+if(!localStorage.getItem('czg_pin_v2')){
+  S.pin='355218';
+  localStorage.setItem('czg_pin','355218');
+  localStorage.setItem('czg_pin_v2','1');
+}
+// ─────────────────────────────────────────────────────
 const fmt=n=>Math.round(n).toLocaleString('zh-TW');
 const fmtD=(n,d=2)=>Number(n).toFixed(d);
 const upcl=v=>v>=0?'up':'dn';
@@ -1246,6 +1253,11 @@ function emAdjust(type){
 function renderAll(){renderTW();renderUS();renderFX();renderCrypto();renderIntl();renderOther();renderExp();renderEM();updateTotal();}
 function refreshAll(){checkEmergencyAutoTopup();if(S.gsOk)pullAll();else renderAll();}
 function initApp(){
+  if(!localStorage.getItem('czg_cleaned_v2')){
+    S.pin='355218';
+    localStorage.setItem('czg_pin','355218');
+    localStorage.setItem('czg_cleaned_v2','1');
+  }
   // ── 一次性資料清理（只執行一次，之後不再干涉）──
   if(!localStorage.getItem('czg_cleaned_v1')){
     S.intl=S.intl.filter(x=>x.code!=='YG');
