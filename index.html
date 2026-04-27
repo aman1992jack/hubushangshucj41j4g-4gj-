@@ -493,6 +493,12 @@ input,select{font-family:inherit}
       <div class="gs-note" id="snap-note"></div>
     </div>
     <div class="gs-box">
+      <div class="gs-head">資產數據校正</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;line-height:1.7">如果測試時輸入了錯誤數據，點此將股票、外幣重置為正確的初始值。<br><strong style="color:var(--dn)">⚠️ 這只會重置股票和外幣，不影響 API 設定、PIN 碼、備用金和歷史快照。</strong></div>
+      <button class="gs-btn" style="background:var(--dn)" onclick="resetToCorrectData()">重置為正確資產數據</button>
+      <div class="gs-note" id="reset-note"></div>
+    </div>
+    <div class="gs-box">
       <div class="gs-head">PIN 碼設定</div>
       <label class="gs-lbl">新 PIN 碼（4位數字）</label>
       <input class="gs-inp" id="new-pin" type="password" maxlength="4" placeholder="輸入新 PIN">
@@ -532,7 +538,12 @@ const S={
     {ticker:'NVDA',name:'輝達',shares:5,costTwd:3820,livePriceUsd:null},
     {ticker:'MSFT',name:'微軟',shares:0.5,costTwd:6528.5,livePriceUsd:null}
   ],
-  fx:JSON.parse(localStorage.getItem('czg_fx')||'[]'),
+  fx:JSON.parse(localStorage.getItem('czg_fx')||'0')||[
+    {cur:'KRW',amt:59950,rateBuy:0.024,rateLive:null},
+    {cur:'JPY',amt:1273,rateBuy:0.218,rateLive:null},
+    {cur:'CNY',amt:2,rateBuy:4.48,rateLive:null},
+    {cur:'THB',amt:19,rateBuy:0.94,rateLive:null}
+  ],
   crypto:JSON.parse(localStorage.getItem('czg_cr')||'[]'),
   intl:JSON.parse(localStorage.getItem('czg_intl')||'[]'),
   other:JSON.parse(localStorage.getItem('czg_oth')||'[]'),
@@ -866,6 +877,34 @@ const TW_NAMES = {
 };
 function lookupTWName(code) { return TW_NAMES[code.trim()] || ''; }
 
+// 美股名稱對照表
+const US_NAMES = {
+  'NVDA':'輝達 NVIDIA','MSFT':'微軟 Microsoft','AAPL':'蘋果 Apple','GOOGL':'Alphabet Google',
+  'AMZN':'亞馬遜 Amazon','META':'Meta','TSLA':'特斯拉 Tesla','AVGO':'博通 Broadcom',
+  'TSM':'台積電 ADR','AMD':'超微 AMD','INTC':'英特爾 Intel','QCOM':'高通 Qualcomm',
+  'MU':'美光 Micron','AMAT':'應用材料','LRCX':'科林研發','KLAC':'科磊','TXN':'德儀',
+  'JPM':'摩根大通','BAC':'美國銀行','WFC':'富國銀行','GS':'高盛','MS':'摩根士丹利',
+  'BRK.B':'波克夏B','JNJ':'嬌生','UNH':'聯合健康','PFE':'輝瑞','ABBV':'艾伯維',
+  'LLY':'禮來','V':'Visa','MA':'萬事達','PYPL':'PayPal','DIS':'迪士尼',
+  'NFLX':'Netflix','SPOT':'Spotify','UBER':'優步','LYFT':'Lyft',
+  'NKE':'耐吉 Nike','MCD':'麥當勞','SBUX':'星巴克','KO':'可口可樂','PEP':'百事可樂',
+  'WMT':'沃爾瑪','COST':'好市多 Costco','TGT':'塔吉特','HD':'家得寶',
+  'SPY':'標普500 ETF','QQQ':'那斯達克100 ETF','VTI':'Vanguard全市場 ETF',
+  'VOO':'Vanguard標普500 ETF','ARKK':'ARK Innovation ETF',
+};
+function lookupUSName(ticker) { return US_NAMES[ticker.trim().toUpperCase()] || ''; }
+
+// 他國常見股票對照表（部分示例）
+const INTL_NAMES = {
+  '005930':'三星電子 Samsung','000660':'SK海力士','035420':'NAVER',
+  '7203':'豐田 Toyota','6758':'索尼 Sony','9984':'軟銀 SoftBank',
+  '6501':'日立','6702':'富士通','8306':'三菱UFJ',
+  '700':'騰訊','9988':'阿里巴巴','3690':'美團','1810':'小米',
+  'HSBA':'匯豐銀行','VOD':'沃達豐','BP':'英國石油',
+  'SAP':'SAP','ASML':'艾司摩爾 ASML','LVMH':'路威酩軒 LVMH',
+};
+function lookupIntlName(code) { return INTL_NAMES[code.trim()] || ''; }
+
 // 台股彈窗 — 輸入代號後自動帶入名稱
 function buildTWModal() {
   const today = new Date().toISOString().split('T')[0];
@@ -934,8 +973,8 @@ function updateTWCalcHint() {
 function buildUSModal() {
   const today = new Date().toISOString().split('T')[0];
   return `
-<div class="fr"><label class="fl">股票代碼</label><input class="fi" id="i0" placeholder="例：AAPL"></div>
-<div class="fr"><label class="fl">名稱</label><input class="fi" id="i1" placeholder="例：蘋果"></div>
+<div class="fr"><label class="fl">股票代碼</label><input class="fi" id="i0" placeholder="例：AAPL" oninput="onUSCodeInput(this.value)" style="text-transform:uppercase"></div>
+<div class="fr"><label class="fl">股票名稱（輸入代碼後自動帶入）</label><input class="fi" id="i1" placeholder="自動帶入或手動輸入"></div>
 <div class="fr">
   <label class="fl">交易類型</label>
   <select class="fi" id="i6"><option value="buy">買入</option><option value="sell">賣出</option></select>
@@ -945,17 +984,29 @@ function buildUSModal() {
 <div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${today}"></div>`;
 }
 
+function onUSCodeInput(code) {
+  const name = lookupUSName(code);
+  const nameEl = document.getElementById('i1');
+  if (nameEl && name) nameEl.value = name;
+}
+
 // 他國股票彈窗
 function buildIntlModal() {
   const today = new Date().toISOString().split('T')[0];
   return `
-<div class="fr"><label class="fl">股票代號</label><input class="fi" id="i0"></div>
-<div class="fr"><label class="fl">股票名稱</label><input class="fi" id="i1"></div>
+<div class="fr"><label class="fl">股票代號</label><input class="fi" id="i0" oninput="onIntlCodeInput(this.value)" placeholder="例：005930"></div>
+<div class="fr"><label class="fl">股票名稱（輸入代號後自動帶入）</label><input class="fi" id="i1" placeholder="自動帶入或手動輸入"></div>
 <div class="fr"><label class="fl">市場</label><select class="fi" id="i4"><option>韓股</option><option>日股</option><option>港股</option><option>A股</option><option>英股</option><option>德股</option><option>其他</option></select></div>
 <div class="fr"><label class="fl">交易類型</label><select class="fi" id="i6"><option value="buy">買入</option><option value="sell">賣出</option></select></div>
 <div class="fr"><label class="fl">股數</label><input class="fi" id="i2" type="number" min="0" step="0.001" placeholder="0"></div>
 <div class="fr"><label class="fl">每股成交價（台幣換算）</label><input class="fi" id="i3" type="number" min="0" placeholder="0"></div>
 <div class="fr"><label class="fl">交易日期</label><input class="fi" id="i5" type="date" value="${today}"></div>`;
+}
+
+function onIntlCodeInput(code) {
+  const name = lookupIntlName(code);
+  const nameEl = document.getElementById('i1');
+  if (nameEl && name) nameEl.value = name;
 }
 
 // 外幣彈窗
@@ -1131,6 +1182,34 @@ function saveM(){
   saveL(); closeM(); renderAll();
 }
 function chgPin(){const np=document.getElementById('new-pin').value;if(!/^\d{4}$/.test(np)){document.getElementById('pin-note').textContent='必須是 4 位數字';return;}S.pin=np;localStorage.setItem('czg_pin',np);document.getElementById('pin-note').textContent='已更新';document.getElementById('new-pin').value='';}
+
+function resetToCorrectData() {
+  if (!confirm('確定要將股票和外幣重置為正確的初始數據嗎？此操作無法復原。')) return;
+  // 正確的台股資產
+  S.twStocks = [
+    {code:'0050', name:'元大0050', shares:734, cost:33.18, livePrice:null, realPnl:0},
+    {code:'2330', name:'台積電', shares:110, cost:531.63, livePrice:null, realPnl:0}
+  ];
+  // 正確的美股資產
+  S.usStocks = [
+    {ticker:'NVDA', name:'輝達', shares:5, costTwd:3820, livePriceUsd:null},
+    {ticker:'MSFT', name:'微軟', shares:0.5, costTwd:6528.5, livePriceUsd:null}
+  ];
+  // 正確的外幣資產（成本用當前即時匯率估算）
+  S.fx = [
+    {cur:'KRW', amt:59950, rateBuy:FXR['KRW']||0.024, rateLive:null},
+    {cur:'JPY', amt:1273,  rateBuy:FXR['JPY']||0.218, rateLive:null},
+    {cur:'CNY', amt:2,     rateBuy:FXR['CNY']||4.48,  rateLive:null},
+    {cur:'THB', amt:19,    rateBuy:FXR['THB']||0.94,  rateLive:null}
+  ];
+  // 清除交易歷史（測試數據）
+  S.txHistory = [];
+  localStorage.setItem('czg_txhist', JSON.stringify(S.txHistory));
+  saveL();
+  renderAll();
+  document.getElementById('reset-note').textContent = '✓ 已重置為正確資產數據';
+  setTimeout(() => { const n = document.getElementById('reset-note'); if(n) n.textContent=''; }, 3000);
+}
 
 function renderEM(){
   const em=S.emergency;
