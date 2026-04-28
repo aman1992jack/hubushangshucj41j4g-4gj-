@@ -487,7 +487,7 @@ input,select{font-family:inherit}
       <div class="gs-head">資產數據備份至試算表</div>
       <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;line-height:1.7">
         將 App 內的所有資產數據（股票、外幣等）儲存到試算表，防止換手機或清除瀏覽器後資料遺失。<br>
-        <strong>分頁名稱：「App資產備份」</strong>（自動建立）
+        <strong>備份到「戶部尚書資料庫」分頁</strong>（需先在試算表中建立此分頁）
       </div>
       <div class="btn-row">
         <button class="gs-btn" onclick="backupAssetsToSheet()">☁ 立即備份到試算表</button>
@@ -580,22 +580,9 @@ const S={
 // ── PIN 碼版本遷移（只執行一次）──
 if(!localStorage.getItem('czg_pin_v2')){
   localStorage.setItem('czg_pin_v2','1');
-  // Don't force pin, just migrate
 }
-// ── 啟動邏輯：如果沒有開啟 PIN 鎖定，直接顯示 App ──
-(function startupCheck(){
-  if(!S.pinEnabled){
-    document.getElementById('lock').style.display='none';
-    const a=document.getElementById('app');
-    a.style.display='flex';a.style.flexDirection='column';
-    // initApp will be called once DOM is ready
-    if(document.readyState==='loading'){
-      document.addEventListener('DOMContentLoaded',initApp);
-    } else {
-      initApp();
-    }
-  }
-})();
+// ── 工具函數（必須在 startupCheck 之前定義）──
+const fmt=n=>Math.round(n).toLocaleString('zh-TW');
 const fmtD=(n,d=2)=>Number(n).toFixed(d);
 const upcl=v=>v>=0?'up':'dn';
 const sign=v=>v>=0?'+':'';
@@ -610,6 +597,19 @@ const saveL=()=>{
   localStorage.setItem('czg_hist',JSON.stringify(S.history));
   if(S.txHistory)localStorage.setItem('czg_txhist',JSON.stringify(S.txHistory));
 };
+// ── 啟動邏輯：如果沒有開啟 PIN 鎖定，直接顯示 App ──
+(function startupCheck(){
+  if(!S.pinEnabled){
+    document.getElementById('lock').style.display='none';
+    const a=document.getElementById('app');
+    a.style.display='flex';a.style.flexDirection='column';
+    if(document.readyState==='loading'){
+      document.addEventListener('DOMContentLoaded',initApp);
+    } else {
+      initApp();
+    }
+  }
+})();
 
 function pk(d){
   const maxLen=S.pin.length||4;
@@ -1443,12 +1443,14 @@ async function backupAssetsToSheet(){
   if(!S.gsOk||!S.gsKey){document.getElementById('backup-note').textContent='請先連接試算表';return;}
   document.getElementById('backup-note').textContent='備份中...';
   try{
-    const sheetName='App資產備份';
+    const sheetName='戶部尚書資料庫';
     const sn=encodeURIComponent(sheetName);
+    // For FX: if no cost memory, use live rate as cost
+    const fxData=S.fx.map(f=>({...f,rateBuy:f.rateLive||f.rateBuy}));
     const data={
       tw:JSON.stringify(S.twStocks),
       us:JSON.stringify(S.usStocks),
-      fx:JSON.stringify(S.fx),
+      fx:JSON.stringify(fxData),
       cr:JSON.stringify(S.crypto),
       intl:JSON.stringify(S.intl),
       oth:JSON.stringify(S.other),
@@ -1472,25 +1474,23 @@ async function backupAssetsToSheet(){
       ['PIN啟用',data.pinEnabled]
     ];
     // Clear and rewrite
-    const clearUrl=`https://sheets.googleapis.com/v4/spreadsheets/${S.gsId}/values/${sn}!A1:B100:clear?key=${S.gsKey}`;
-    await fetch(clearUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-    const writeUrl=`https://sheets.googleapis.com/v4/spreadsheets/${S.gsId}/values/${sn}!A1?valueInputOption=RAW&key=${S.gsKey}`;
-    const resp=await fetch(writeUrl,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S.gsId}/values/${sn}!A1:B100:clear?key=${S.gsKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S.gsId}/values/${sn}!A1?valueInputOption=RAW&key=${S.gsKey}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:rows})});
     const d=await resp.json();
     if(d.updatedCells||d.updatedRows){
-      document.getElementById('backup-note').textContent='✓ 備份成功！時間：'+data.ts;
+      document.getElementById('backup-note').textContent='✓ 備份成功！已寫入「戶部尚書資料庫」分頁，時間：'+data.ts;
     } else {
-      document.getElementById('backup-note').textContent='備份可能失敗：'+(d.error?.message||'未知錯誤')+'。若分頁不存在請先手動建立「App資產備份」分頁。';
+      document.getElementById('backup-note').textContent='寫入失敗：'+(d.error?.message||JSON.stringify(d));
     }
   }catch(e){document.getElementById('backup-note').textContent='錯誤：'+e.message;}
 }
 
 async function restoreAssetsFromSheet(){
   if(!S.gsOk||!S.gsKey){document.getElementById('backup-note').textContent='請先連接試算表';return;}
-  if(!confirm('確定要從試算表還原資產數據嗎？這將覆蓋 App 目前的所有資產數據。')){return;}
+  if(!confirm('確定要從「戶部尚書資料庫」分頁還原資產數據嗎？這將覆蓋 App 目前的所有資產數據。')){return;}
   document.getElementById('backup-note').textContent='還原中...';
   try{
-    const sn=encodeURIComponent('App資產備份');
+    const sn=encodeURIComponent('戶部尚書資料庫');
     const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S.gsId}/values/${sn}!A1:B20?key=${S.gsKey}`);
     const d=await r.json();
     if(!d.values||d.values.length<2){document.getElementById('backup-note').textContent='找不到備份數據，請先備份一次。';return;}
