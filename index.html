@@ -7,548 +7,394 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="戶部尚書">
-<meta name="theme-color" content="#111110">
+<meta name="theme-color" content="#C8962A">
+<link rel="manifest" id="pwa-manifest">
+<link rel="apple-touch-icon" id="apple-icon">
+<script>
+/* ── PWA Manifest：使用外部 logo.png ── */
+(function(){
+  const logoUrl = 'logo.png';
+  const appleIcon = document.getElementById('apple-icon');
+  if(appleIcon) appleIcon.href = logoUrl;
+  const m = {
+    name:'戶部尚書', short_name:'戶部尚書',
+    description:'個人資產追蹤', start_url:'.',
+    display:'standalone', background_color:'#111110',
+    theme_color:'#C8962A', orientation:'portrait',
+    icons:[{src:logoUrl, sizes:'512x512', type:'image/png'}]
+  };
+  const b = new Blob([JSON.stringify(m)], {type:'application/json'});
+  document.getElementById('pwa-manifest').href = URL.createObjectURL(b);
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<style>
-:root {
-  --bg: #111110; --surf: #1A1A1A; --surf2: #252525; --surf3: #333333;
-  --tx: #F2F2F2; --tx2: #A0A0A0; --tx3: #777777;
-  --bd: #333333; --bd2: #444444; --gold: #C8962A; --r: 8px; --r2: 14px;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Sans TC', sans-serif; }
-body { background: var(--bg); color: var(--tx); overflow: hidden; font-size: 14px; }
-/* 台灣股市習慣：紅漲綠跌 */
-.up { color: #E74C3C !important; } 
-.dn { color: #2ECC71 !important; }
-.empty { text-align: center; padding: 28px 0; font-size: 12px; color: var(--tx3); }
-#app { display: none; flex-direction: column; height: 100vh; }
-#lock { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: var(--bg); }
-.lk-logo { width: 80px; height: 80px; margin-bottom: 20px; border-radius: 20px; }
-.pin-dots { display: flex; gap: 10px; margin: 20px 0; }
-.kp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
-.kpb { width: 60px; height: 60px; border-radius: 50%; background: var(--surf2); border: none; color: var(--tx); font-size: 20px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
-.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--surf); border-bottom: 1px solid var(--bd); }
-.ht { font-size: 18px; font-weight: 700; color: var(--gold); }
-.ibtn { background: none; border: none; color: var(--tx); font-size: 18px; cursor: pointer; }
-.main { flex: 1; overflow-y: auto; padding: 16px 20px; }
-.pane { display: none; } .pane.on { display: block; }
-.nav { display: flex; background: var(--surf); border-top: 1px solid var(--bd); padding-bottom: env(safe-area-inset-bottom); }
-.nav-btn { flex: 1; background: none; border: none; color: var(--tx3); font-size: 10px; padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
-.nav-btn.on { color: var(--gold); }
-.nav-ico { font-size: 18px; }
-.sec-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.s-title { font-size: 15px; font-weight: 700; }
-.s-val { font-size: 24px; font-weight: 700; font-family: 'DM Mono', monospace; margin-top: 4px; }
-.tbl-wrap { overflow-x: auto; background: var(--surf); border-radius: var(--r2); border: 1px solid var(--bd); margin-bottom: 14px; }
-.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
-.tbl th, .tbl td { padding: 10px; text-align: right; border-bottom: 1px solid var(--bd2); white-space: nowrap; }
-.tbl th:first-child, .tbl td:first-child { text-align: left; }
-.addbtn { width: 100%; padding: 12px; background: var(--surf2); border: 1px dashed var(--bd2); color: var(--gold); border-radius: var(--r); font-weight: 700; font-size: 14px; cursor: pointer; margin-bottom: 20px; }
-#settings-panel { position: fixed; top: 0; right: -100%; width: min(360px, 100%); height: 100%; background: var(--surf); border-left: 1px solid var(--bd); z-index: 500; transition: right .3s ease; display: flex; flex-direction: column; }
-#settings-panel.open { right: 0; }
-.sp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 499; display: none; }
-.sp-overlay.open { display: block; }
-.sp-hdr { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--bd); }
-.sp-body { flex: 1; overflow-y: auto; padding: 14px; }
-.gs-box { background: var(--surf2); border-radius: var(--r2); border: 1px solid var(--bd); padding: 14px; margin-bottom: 12px; }
-.gs-head { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
-.gs-lbl { font-size: 10px; color: var(--tx2); margin-bottom: 3px; display: block; margin-top: 8px; }
-.gs-inp { width: 100%; padding: 8px; border-radius: var(--r); border: 1px solid var(--bd2); background: var(--surf); color: var(--tx); }
-.btn-row { display: flex; gap: 7px; margin-top: 11px; }
-.gs-btn { padding: 8px 14px; border-radius: var(--r); border: none; background: var(--gold); color: #fff; font-size: 12px; font-weight: 600; flex: 1; cursor: pointer; }
-.gs-btn-sec { background: var(--surf3); border: 1px solid var(--bd2); color: var(--tx2); }
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 600; padding: 20px; }
-.overlay.on { display: flex; }
-.modal { background: var(--surf); border-radius: var(--r2); border: 1px solid var(--bd); padding: 22px; width: 100%; max-width: 340px; max-height: 88vh; overflow-y: auto; }
-.fr { margin-bottom: 10px; } .fl { font-size: 10px; color: var(--tx2); margin-bottom: 4px; display: block; }
-.fi { width: 100%; padding: 8px 11px; border-radius: var(--r); border: 1px solid var(--bd2); background: var(--surf2); color: var(--tx); font-size: 13px; }
-.mact { display: flex; gap: 8px; margin-top: 14px; }
-.mc { flex: 1; padding: 9px; border-radius: var(--r); border: 1px solid var(--bd2); background: none; color: var(--tx2); cursor: pointer; }
-.ms { flex: 1; padding: 9px; border-radius: var(--r); border: none; background: var(--gold); color: #fff; font-weight: 600; cursor: pointer; }
-.cf-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--bd); }
-.stk-agg { background: var(--surf2); padding: 14px; border-radius: var(--r2); border: 1px solid var(--bd); margin-bottom: 16px; }
-.mini-pie-wrap { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; background: var(--surf); padding: 12px; border-radius: var(--r); border: 1px solid var(--bd); }
-.mini-pie-canvas { width: 70px; height: 70px; }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div id="lock">
-  <div style="font-size:20px; font-weight:700; color:var(--gold)">戶部尚書</div>
-  <div class="pin-dots" id="pin-dots"></div>
-  <div id="perr" style="color:var(--gold); font-size:12px; height:16px;"></div>
-  <div class="kp">
-    <button class="kpb" onclick="pk(1)">1</button><button class="kpb" onclick="pk(2)">2</button><button class="kpb" onclick="pk(3)">3</button>
-    <button class="kpb" onclick="pk(4)">4</button><button class="kpb" onclick="pk(5)">5</button><button class="kpb" onclick="pk(6)">6</button>
-    <button class="kpb" onclick="pk(7)">7</button><button class="kpb" onclick="pk(8)">8</button><button class="kpb" onclick="pk(9)">9</button>
-    <div></div><button class="kpb" onclick="pk(0)">0</button><button class="kpb" onclick="pdel()">⌫</button>
+<!-- ══════════════════ LOCK SCREEN ══════════════════ -->
+<div id="lock" style="display:none">
+  <img class="lk-logo" id="lk-logo-img" src="logo.png" alt="戶部尚書">
+  <div class="lk-t">戶部尚書</div>
+  <div class="lk-s">輸入 PIN 碼解鎖</div>
+  <div class="dots" id="pin-dots"></div>
+  <div class="perr" id="perr"></div>
+  <div class="pad">
+    <button class="pk" onclick="pk(1)">1</button><button class="pk" onclick="pk(2)">2</button><button class="pk" onclick="pk(3)">3</button>
+    <button class="pk" onclick="pk(4)">4</button><button class="pk" onclick="pk(5)">5</button><button class="pk" onclick="pk(6)">6</button>
+    <button class="pk" onclick="pk(7)">7</button><button class="pk" onclick="pk(8)">8</button><button class="pk" onclick="pk(9)">9</button>
+    <button class="pk" onclick="pk(0)" style="grid-column:2">0</button>
+    <button class="pk" onclick="pdel()" style="font-size:14px">⌫</button>
   </div>
 </div>
 
+<!-- ══════════════════ APP ══════════════════ -->
 <div id="app">
-  <div class="header">
-    <div class="ht">戶部尚書</div>
-    <div style="display:flex; gap:15px;">
-      <button class="ibtn" onclick="doSync()">🔄</button>
-      <button class="ibtn" onclick="openSP()">⚙️</button>
+  <div class="hdr">
+    <div class="hdr-l">
+      <img class="h-logo" id="h-logo-img" src="logo.png" alt="戶部尚書">
+      <div class="h-name">戶部尚書</div>
+    </div>
+    <div class="hdr-r">
+      <div class="sync-pill" id="sync-pill" onclick="doSync()">
+        <div class="sdot" id="sdot"></div>
+        <span id="stxt">未連接</span>
+      </div>
+      <button class="ibtn" onclick="openSP()">⚙</button>
+      <button class="ibtn" onclick="lockApp()">⊠</button>
     </div>
   </div>
-  
+
   <div class="main">
-    <div id="b-amt" style="font-size:32px; font-weight:700; font-family:'DM Mono',monospace; text-align:center; margin-bottom:4px;">NT$ 0</div>
-    <div id="b-pnl" style="text-align:center; font-size:12px; margin-bottom:20px;"></div>
-
-    <div id="pane-cashflow" class="pane on">
-      <div class="stk-agg" style="height:200px; position:relative;">
-        <canvas id="dc"></canvas>
+    <!-- BANNER -->
+    <div class="banner" onclick="goOverview()" id="main-banner">
+      <div class="b-lbl">總資產（台幣）</div>
+      <div class="b-top">
+        <div>
+          <div class="b-amt" id="b-amt">NT$ —</div>
+          <div class="b-pnl" id="b-pnl"></div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--tx3)" id="upd">—</div>
+          <button class="ibtn" onclick="event.stopPropagation();refreshAll()" style="margin-top:6px;margin-left:auto">↻</button>
+        </div>
       </div>
-      <div class="sec-hdr"><div class="s-title">近期變動</div></div>
-      <div id="cf-list"></div>
+      <div class="seg-bar" id="sbar"></div>
+      <div class="seg-leg" id="sleg"></div>
+      <div class="banner-hint">▲ 點此查看總覽</div>
     </div>
 
+    <!-- OVERVIEW -->
+    <div id="pane-overview" class="pane" style="display:none">
+      <div class="chart-container">
+        <div class="chart-toggle">
+          <button class="ctg-btn on" id="ctg-pie" onclick="switchChart('pie')">資產分佈</button>
+          <button class="ctg-btn" id="ctg-trend" onclick="switchChart('trend')">資產走勢</button>
+        </div>
+        <div class="chart-area" id="ca-pie">
+          <div class="chart-wrap"><canvas id="dc" role="img" aria-label="資產分佈圓餅圖">資產分佈圓餅圖</canvas></div>
+        </div>
+        <div class="chart-area" id="ca-trend" style="display:none">
+          <div class="trend-ctrl">
+            <div class="trend-ranges">
+              <button class="tr-btn on" onclick="setRange(1,this)">1年</button>
+              <button class="tr-btn" onclick="setRange(3,this)">3年</button>
+              <button class="tr-btn" onclick="setRange(5,this)">5年</button>
+              <button class="tr-btn" onclick="setRange(10,this)">10年</button>
+              <button class="tr-btn" onclick="setRange(20,this)">20年</button>
+              <button class="tr-btn" onclick="setRange(0,this)">全部</button>
+            </div>
+            <div style="font-size:10px;color:var(--tx3)">每月快照</div>
+          </div>
+          <div class="chart-wrap"><canvas id="tc" role="img" aria-label="資產走勢圖">資產走勢圖</canvas></div>
+        </div>
+      </div>
+      <div class="ov-grid" id="ov-cards"></div>
+      <div style="text-align:center;margin-top:14px">
+        <button onclick="goOverview()" style="font-size:11px;color:var(--tx3);padding:4px 10px">▼ 收起</button>
+      </div>
+    </div>
+
+    <!-- CASHFLOW -->
+    <div id="pane-cashflow" class="pane">
+      <div class="info-box"><strong>現金流（唯讀）</strong><br>從試算表讀取，僅供檢視。</div>
+      <div class="cf-summary">
+        <div class="cf-card"><div class="cf-lbl">本月收入</div><div class="cf-val up" id="cf-in">+0</div></div>
+        <div class="cf-card"><div class="cf-lbl">本月支出</div><div class="cf-val dn" id="cf-out">-0</div></div>
+        <div class="cf-card"><div class="cf-lbl">結餘</div><div class="cf-val" id="cf-net">0</div></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="s-title">近期記錄</div>
+        <div style="font-size:10px;color:var(--tx3)">🔒 唯讀</div>
+      </div>
+      <div id="exp-list"><div class="empty">從試算表同步後顯示</div></div>
+    </div>
+
+    <!-- STOCKS -->
     <div id="pane-stocks" class="pane">
-      <div class="stk-agg">
-        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:10px;">
-          <div><div style="font-size:11px; color:var(--tx2);">股票總資產</div><div class="s-val" id="stk-tot">NT$ 0</div></div>
+      <div id="stk-l1">
+        <div class="stk-grid">
+          <div class="stk-mkt-card" onclick="enterL2('tw')">
+            <div class="stk-mkt-ico">🇹🇼</div>
+            <div class="stk-mkt-name">台股</div>
+            <div class="stk-mkt-val" id="tw-sum-v">NT$ —</div>
+            <div class="stk-mkt-pnl" id="tw-sum-p"></div>
+          </div>
+          <div class="stk-mkt-card" onclick="enterL2('us')">
+            <div class="stk-mkt-ico">🇺🇸</div>
+            <div class="stk-mkt-name">美股</div>
+            <div class="stk-mkt-val" id="us-sum-v">NT$ —</div>
+            <div class="stk-mkt-pnl" id="us-sum-p"></div>
+          </div>
+          <div class="stk-mkt-card" onclick="enterL2('intl')">
+            <div class="stk-mkt-ico">🌏</div>
+            <div class="stk-mkt-name">他國</div>
+            <div class="stk-mkt-val" id="intl-sum-v">NT$ —</div>
+            <div class="stk-mkt-pnl" id="intl-sum-p"></div>
+          </div>
+        </div>
+        <div class="stk-agg">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
+            <div><div style="font-size:11px;color:var(--tx2)">股票總資產</div><div style="font-size:18px;font-weight:700;font-family:'DM Mono',monospace" id="stk-tot">NT$ —</div></div>
+            <div style="text-align:right;font-size:11px" id="stk-tot-pnl"></div>
+          </div>
+          <div style="position:relative;width:100%;height:120px"><canvas id="stk-pie" role="img" aria-label="股票分佈">股票分佈</canvas></div>
         </div>
       </div>
-      <div id="detail-tw">
-        <div class="sec-hdr"><div><div class="s-title">台股</div><div class="s-val" id="tw-val">NT$ 0</div></div></div>
-        <div class="mini-pie-wrap">
-          <div class="mini-pie-canvas"><canvas id="tw-mini-pie"></canvas></div>
-          <div id="tw-mini-legend" style="font-size:12px;"></div>
-        </div>
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>股票</th><th>股數</th><th>現價</th><th>市值</th><th>損益</th></tr></thead>
+      <div id="stk-l2" style="display:none">
+        <button class="back-btn" onclick="exitL2()">← 返回</button>
+        <!-- TW detail -->
+        <div id="detail-tw" style="display:none">
+          <div class="sec-hdr">
+            <div><div class="s-title">台股 <span class="badge btw">TW</span></div><div class="s-val" id="tw-val">NT$ —</div><div class="s-pnl" id="tw-pnl"></div></div>
+            <div style="font-size:10px;color:var(--tx2)" id="tw-real"></div>
+          </div>
+          <div class="mini-pie-wrap">
+            <div class="mini-pie-canvas"><canvas id="tw-mini-pie" role="img" aria-label="台股損益圖">台股損益圖</canvas></div>
+            <div class="mini-pie-legend" id="tw-mini-legend"></div>
+          </div>
+          <div class="tbl-wrap"><table class="tbl">
+            <thead><tr><th style="min-width:90px">股票</th><th>股數</th><th>成本/股</th><th>現價</th><th>漲跌%</th><th>市值</th><th>損益</th></tr></thead>
             <tbody id="tw-body"></tbody>
-          </table>
+          </table></div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <button class="addbtn" style="margin:0;flex:1" onclick="showM('tw')">＋ 新增台股</button>
+            <button class="hist-btn" onclick="showHist('tw')">📋 歷史</button>
+          </div>
+          <div id="hist-tw" class="hist-list" style="display:none"></div>
         </div>
-        <button class="addbtn" onclick="showM('tw')">＋ 新增台股交易</button>
-      </div>
-      <div id="detail-us">
-        <div class="sec-hdr"><div><div class="s-title">美股</div><div class="s-val" id="us-val">NT$ 0</div></div></div>
-        <div class="mini-pie-wrap">
-          <div class="mini-pie-canvas"><canvas id="us-mini-pie"></canvas></div>
-          <div id="us-mini-legend" style="font-size:12px;"></div>
-        </div>
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>股票</th><th>股數</th><th>現價</th><th>市值</th><th>損益</th></tr></thead>
+        <!-- US detail -->
+        <div id="detail-us" style="display:none">
+          <div class="sec-hdr">
+            <div><div class="s-title">美股 <span class="badge bus">US</span></div><div class="s-val" id="us-val">NT$ —</div><div class="s-pnl" id="us-pnl"></div></div>
+          </div>
+          <div class="mini-pie-wrap">
+            <div class="mini-pie-canvas"><canvas id="us-mini-pie" role="img" aria-label="美股損益圖">美股損益圖</canvas></div>
+            <div class="mini-pie-legend" id="us-mini-legend"></div>
+          </div>
+          <div class="tbl-wrap"><table class="tbl">
+            <thead><tr><th style="min-width:90px">股票</th><th>股數</th><th>成本(NT)</th><th>現價(NT)</th><th>漲跌%</th><th>市值</th><th>損益</th></tr></thead>
             <tbody id="us-body"></tbody>
-          </table>
+          </table></div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <button class="addbtn" style="margin:0;flex:1" onclick="showM('us')">＋ 新增美股</button>
+            <button class="hist-btn" onclick="showHist('us')">📋 歷史</button>
+          </div>
+          <div id="hist-us" class="hist-list" style="display:none"></div>
         </div>
-        <button class="addbtn" onclick="showM('us')">＋ 新增美股交易</button>
-      </div>
-      <div id="detail-intl">
-        <div class="sec-hdr"><div><div class="s-title">他國股票</div><div class="s-val" id="intl-val">NT$ 0</div></div></div>
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>股票</th><th>市場</th><th>股數</th><th>市值</th></tr></thead>
-            <tbody id="intl-body"></tbody>
-          </table>
+        <!-- INTL detail -->
+        <div id="detail-intl" style="display:none">
+          <div class="sec-hdr"><div><div class="s-title">他國股票 <span class="badge bintl">INTL</span></div><div class="s-val" id="intl-val">NT$ —</div></div></div>
+          <div class="tbl-wrap"><table class="tbl">
+            <thead><tr><th style="min-width:90px">股票</th><th>股數</th><th>市場</th><th>成本(NT)</th><th>現價(NT)</th><th>市值</th><th>損益</th></tr></thead>
+            <tbody id="intl-body"><tr><td colspan="7" class="empty">尚無他國股票</td></tr></tbody>
+          </table></div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <button class="addbtn" style="margin:0;flex:1" onclick="showM('intl')">＋ 新增他國股票</button>
+            <button class="hist-btn" onclick="showHist('intl')">📋 歷史</button>
+          </div>
+          <div id="hist-intl" class="hist-list" style="display:none"></div>
         </div>
-        <button class="addbtn" onclick="showM('intl')">＋ 新增他國股票</button>
       </div>
     </div>
 
+    <!-- FX -->
     <div id="pane-fx" class="pane">
-      <div class="sec-hdr"><div><div class="s-title">外幣總資產</div><div class="s-val" id="fx-val">NT$ 0</div></div></div>
-      <div class="tbl-wrap">
-        <table class="tbl">
-          <thead><tr><th>幣別</th><th>數量</th><th>匯率</th><th>約當台幣</th></tr></thead>
-          <tbody id="fx-body"></tbody>
-        </table>
+      <div class="sec-hdr">
+        <div><div class="s-title">外幣持有</div><div class="s-val" id="fx-val">NT$ 0</div></div>
+        <button class="hist-btn" onclick="showHist('fx')">📋 歷史</button>
       </div>
-      <button class="addbtn" onclick="showM('fx')">＋ 新增外幣</button>
+      <div class="fx-grid" id="fx-grid"><div class="empty">尚無外幣紀錄</div></div>
+      <div id="hist-fx" class="hist-list" style="display:none"></div>
+      <button class="addbtn" onclick="showM('fx')" style="margin-top:10px">＋ 新增外幣</button>
     </div>
 
+    <!-- CRYPTO -->
     <div id="pane-crypto" class="pane">
-      <div class="sec-hdr"><div><div class="s-title">加密貨幣</div><div class="s-val" id="cr-val">NT$ 0</div></div></div>
-      <div class="tbl-wrap">
-        <table class="tbl">
-          <thead><tr><th>幣別</th><th>數量</th><th>現價</th><th>約當台幣</th></tr></thead>
-          <tbody id="cr-body"></tbody>
-        </table>
+      <div class="sec-hdr">
+        <div><div class="s-title">虛擬貨幣 <span class="badge bcr">Crypto</span></div><div class="s-val" id="cr-val">NT$ 0</div><div class="s-pnl" id="cr-pnl"></div></div>
+        <button class="hist-btn" onclick="showHist('cr')">📋 歷史</button>
       </div>
+      <div id="hist-cr" class="hist-list" style="display:none"></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th style="min-width:70px">幣種</th><th>數量</th><th>成本/單位</th><th>現價(NT)</th><th>市值</th><th>報酬%</th><th>損益</th></tr></thead>
+        <tbody id="cr-body"><tr><td colspan="7" class="empty">尚無加密貨幣</td></tr></tbody>
+      </table></div>
       <button class="addbtn" onclick="showM('crypto')">＋ 新增加密貨幣</button>
     </div>
 
+    <!-- EMERGENCY -->
     <div id="pane-emergency" class="pane">
-      <div class="sec-hdr"><div><div class="s-title">緊急備用金</div><div class="s-val" id="em-bal">NT$ 0</div></div></div>
-      <div style="background:var(--surf2); border-radius:var(--r); padding:14px; border:1px solid var(--bd); margin-bottom:14px;">
-        <div style="margin-bottom:10px;">手動調整備用金：</div>
-        <input class="gs-inp" id="em-input" type="number" placeholder="輸入金額">
-        <div class="btn-row">
-          <button class="gs-btn" onclick="emAdjust('add')">＋ 存入</button>
-          <button class="gs-btn gs-btn-sec" onclick="emAdjust('sub')">－ 提取</button>
+      <div style="background:var(--surf);border-radius:var(--r2);border:1px solid var(--bd);padding:16px;margin-bottom:12px;text-align:center">
+        <div style="font-size:11px;color:var(--tx2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">緊急備用金</div>
+        <div style="font-size:32px;font-weight:700;font-family:'DM Mono',monospace;color:var(--gold);letter-spacing:-1px" id="em-bal">NT$ 0</div>
+        <div style="font-size:11px;color:var(--tx2);margin-top:5px" id="em-progress">尚未啟動</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:4px">每月5日自動 +NT$1,000 · 首次需手動存入啟動</div>
+      </div>
+      <div id="em-start-box" style="background:#FEF3CD;border:1px solid #E8C96A;border-radius:var(--r);padding:12px 14px;margin-bottom:12px;font-size:11px;color:#633806;display:none">
+        ⚡ 尚未啟動備用金。點「＋ 存入」存入第一筆（建議 NT$1,000）。
+      </div>
+      <div style="background:var(--surf);border-radius:var(--r2);border:1px solid var(--bd);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:12px;color:var(--tx)">調整金額</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="em-input" type="number" min="0" step="100" placeholder="金額" style="flex:1;min-width:90px;padding:9px 11px;border-radius:var(--r);border:1px solid var(--bd2);background:var(--surf2);font-size:14px;font-family:'DM Mono',monospace;color:var(--tx)">
+          <button onclick="emAdjust('add')" style="padding:9px 14px;border-radius:var(--r);background:var(--gold);color:#fff;font-size:12px;font-weight:600;white-space:nowrap">＋ 存入</button>
+          <button onclick="emAdjust('withdraw')" style="padding:9px 14px;border-radius:var(--r);background:var(--surf2);color:var(--dn);border:1px solid var(--bd2);font-size:12px;font-weight:600;white-space:nowrap">－ 提取</button>
         </div>
       </div>
+      <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--tx)">異動記錄</div>
+      <div id="em-log"><div class="empty">尚無記錄</div></div>
     </div>
 
+    <!-- OTHER -->
     <div id="pane-other" class="pane">
-      <div class="sec-hdr"><div><div class="s-title">其他資產</div><div class="s-val" id="oth-val">NT$ 0</div></div></div>
-      <div class="tbl-wrap">
-        <table class="tbl"><tbody id="oth-body"></tbody></table>
+      <div class="sec-hdr">
+        <div><div class="s-title">其他資產</div><div class="s-val" id="oth-val">NT$ 0</div></div>
+        <button class="hist-btn" onclick="showHist('oth')">📋 歷史</button>
       </div>
-      <button class="addbtn" onclick="showM('other')">＋ 新增其他資產</button>
+      <div id="hist-oth" class="hist-list" style="display:none"></div>
+      <div id="oth-list"><div class="empty">可記錄定存、不動產、借出款項等</div></div>
+      <button class="addbtn" onclick="showM('other')" style="margin-top:10px">＋ 新增其他資產</button>
     </div>
   </div>
 
+  <!-- NAV: 6 tabs -->
   <div class="nav">
-    <button class="nav-btn on" onclick="navTo('cashflow',this)"><span class="nav-ico">⇅</span>總覽</button>
-    <button class="nav-btn" onclick="navTo('stocks',this)"><span class="nav-ico">📈</span>股票</button>
-    <button class="nav-btn" onclick="navTo('fx',this)"><span class="nav-ico">💱</span>外幣</button>
-    <button class="nav-btn" onclick="navTo('crypto',this)"><span class="nav-ico">₿</span>加密</button>
-    <button class="nav-btn" onclick="navTo('emergency',this)"><span class="nav-ico">🛡</span>備用金</button>
-    <button class="nav-btn" onclick="navTo('other',this)"><span class="nav-ico">⊟</span>其他</button>
+    <button class="nav-btn on" id="nav-cashflow" onclick="navTo('cashflow',this)"><span class="nav-ico">⇅</span>現金流</button>
+    <button class="nav-btn" id="nav-stocks" onclick="navTo('stocks',this)"><span class="nav-ico">📈</span>股票</button>
+    <button class="nav-btn" id="nav-fx" onclick="navTo('fx',this)"><span class="nav-ico">💱</span>外幣</button>
+    <button class="nav-btn" id="nav-crypto" onclick="navTo('crypto',this)"><span class="nav-ico">₿</span>加密</button>
+    <button class="nav-btn" id="nav-emergency" onclick="navTo('emergency',this)"><span class="nav-ico">🛡</span>備用金</button>
+    <button class="nav-btn" id="nav-other" onclick="navTo('other',this)"><span class="nav-ico">⊟</span>其他</button>
   </div>
 </div>
 
+<!-- SETTINGS PANEL -->
 <div class="sp-overlay" id="sp-ov" onclick="closeSP()"></div>
 <div id="settings-panel">
-  <div class="sp-hdr"><div class="s-title">設定</div><button class="ibtn" onclick="closeSP()">✕</button></div>
+  <div class="sp-hdr"><div class="sp-title">設定</div><button class="ibtn" onclick="closeSP()">✕</button></div>
   <div class="sp-body">
+    <div class="warn-box">⚠️ API 金鑰請勿分享他人。</div>
     <div class="gs-box">
       <div class="gs-head">Google Sheets 連接</div>
-      <label class="gs-lbl">試算表 ID</label><input class="gs-inp" id="gs-id" value="1FUhXesSModk6yJmjZ34Jn2eklwmNJPpfKkAxrwefyS4">
-      <label class="gs-lbl">API 金鑰</label><input class="gs-inp" id="gs-key" type="password" placeholder="AIzaSy...">
-      <div class="btn-row"><button class="gs-btn" onclick="saveGS()">儲存並連接</button></div>
-    </div>
-    
-    <div class="gs-box">
-      <div class="gs-head">資產數據校正 (從Google Sheets同步)</div>
-      <div style="font-size:11px; color:var(--tx2); margin-bottom:8px;">一鍵從「戶部尚書資料校正」分頁同步最新的股數與各項資產餘額。</div>
-      <div class="btn-row"><button class="gs-btn" onclick="syncCorrection()">同步校正資料</button></div>
-    </div>
-
-    <div class="gs-box">
-      <div class="gs-head">PIN 碼設定</div>
-      <label class="gs-lbl">目前 PIN 碼</label><input class="gs-inp" id="pin-curr" type="password" placeholder="預設 355218">
-      <label class="gs-lbl">新 PIN 碼</label><input class="gs-inp" id="pin-new" type="password" placeholder="設定新密碼">
+      <label class="gs-lbl">試算表 ID</label>
+      <input class="gs-inp" id="gs-id" value="1FUhXesSModk6yJmjZ34Jn2eklwmNJPpfKkAxrwefyS4">
+      <label class="gs-lbl">API 金鑰</label>
+      <input class="gs-inp" id="gs-key" type="password" placeholder="AIzaSy...">
       <div class="btn-row">
-        <button class="gs-btn" onclick="savePin()">更新密碼</button>
-        <button class="gs-btn gs-btn-sec" onclick="togglePin()">啟用 / 停用</button>
+        <button class="gs-btn" onclick="saveGS()">儲存並連接</button>
+        <button class="gs-btn gs-btn-sec" onclick="testConn()">測試</button>
       </div>
-      <div class="gs-lbl" id="pin-note" style="color:var(--gold); margin-top:8px;"></div>
+      <div class="gs-note" id="gs-note"></div>
+    </div>
+    <div class="gs-box">
+      <div class="gs-head">公式分頁欄位</div>
+      <label class="gs-lbl">公式分頁名稱</label><input class="gs-inp" id="cfg-sheet" value="公式">
+      <label class="gs-lbl">0050 現價</label><input class="gs-inp" id="cfg-0050" value="B2">
+      <label class="gs-lbl">2330 現價</label><input class="gs-inp" id="cfg-2330" value="B3">
+      <label class="gs-lbl">NVDA 美元現價</label><input class="gs-inp" id="cfg-nvda" value="D2">
+      <label class="gs-lbl">MSFT 美元現價</label><input class="gs-inp" id="cfg-msft" value="D3">
+      <label class="gs-lbl">USD/TWD 匯率</label><input class="gs-inp" id="cfg-usdtwd" value="F2">
+      <label class="gs-lbl">現金流分頁</label><input class="gs-inp" id="cfg-cf" value="固定支出">
+      <div class="btn-row"><button class="gs-btn" onclick="saveCfg()">儲存欄位設定</button></div>
+      <div class="gs-note" id="cfg-note"></div>
+    </div>
+    <div class="gs-box">
+      <div class="gs-head">資產數據備份至試算表</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;line-height:1.7">
+        將 App 內的所有資產數據（股票、外幣等）儲存到試算表，防止換手機或清除瀏覽器後資料遺失。<br>
+        <strong>備份到「戶部尚書資料庫」分頁</strong>（需先在試算表中建立此分頁）
+      </div>
+      <div class="btn-row">
+        <button class="gs-btn" onclick="backupAssetsToSheet()">☁ 立即備份到試算表</button>
+        <button class="gs-btn gs-btn-sec" onclick="restoreAssetsFromSheet()">⬇ 從試算表還原</button>
+      </div>
+      <div class="gs-note" id="backup-note"></div>
+    </div>
+    <div class="gs-box">
+      <div class="gs-head">每月快照</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:9px">每月月底點一次，記錄到「資產紀錄「存錢冠」」分頁。</div>
+      <button class="gs-btn" onclick="pushSnap()">記錄今日快照</button>
+      <div class="gs-note" id="snap-note"></div>
+    </div>
+    <div class="gs-box">
+      <div class="gs-head">資產數據校正（從試算表同步）</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;line-height:1.7">
+        讀取試算表 gid=2078256663 的校正分頁，自動更新各持股股數與成本。
+      </div>
+      <button class="gs-btn" onclick="syncCorrection()">⟳ 從試算表校正資產</button>
+      <div class="gs-note" id="sync-correction-note"></div>
+    </div>
+    <div class="gs-box">
+      <div class="gs-head">重置資產數據</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;line-height:1.7">如果測試時輸入了錯誤數據，點此將股票、外幣重置為正確的初始值。<br><strong style="color:var(--dn)">⚠️ 這只會重置股票和外幣，不影響 API 設定、PIN 碼、備用金和歷史快照。</strong></div>
+      <button class="gs-btn" style="background:var(--dn)" onclick="resetToCorrectData()">重置為正確資產數據</button>
+      <div class="gs-note" id="reset-note"></div>
+    </div>
+    <div class="gs-box">
+      <div class="gs-head">PIN 碼鎖定設定</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--tx)">開啟 PIN 碼鎖定</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:2px">開啟後，每次開啟 App 需要輸入 PIN 碼</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+          <input type="checkbox" id="pin-enabled" onchange="togglePinLock(this.checked)" style="opacity:0;width:0;height:0">
+          <span id="pin-toggle-track" style="position:absolute;inset:0;border-radius:12px;background:var(--bd2);cursor:pointer;transition:background .2s"></span>
+          <span id="pin-toggle-thumb" style="position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+        </label>
+      </div>
+      <div id="pin-settings-body" style="display:none">
+        <label class="gs-lbl">新 PIN 碼（4～8 位數字）</label>
+        <input class="gs-inp" id="new-pin" type="password" maxlength="8" placeholder="輸入 4 到 8 位數字">
+        <label class="gs-lbl">確認 PIN 碼</label>
+        <input class="gs-inp" id="new-pin2" type="password" maxlength="8" placeholder="再次輸入確認">
+        <div class="btn-row"><button class="gs-btn" onclick="chgPin()">更新 PIN 碼</button></div>
+        <div class="gs-note" id="pin-note"></div>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="overlay" id="modal-ov">
+<!-- MODAL -->
+<div class="overlay" id="ov">
   <div class="modal">
-    <div class="mt" id="m-title">新增紀錄</div>
-    <div id="m-body"></div>
-    <div class="mact">
-      <button class="mc" onclick="closeM()">取消</button>
-      <button class="ms" onclick="saveM()">儲存</button>
-    </div>
+    <div class="mt" id="mt">新增</div>
+    <div id="mb"></div>
+    <div class="mact"><button class="mc" onclick="closeM()">取消</button><button class="ms" onclick="saveM()">儲存</button></div>
   </div>
 </div>
 
+<!-- JavaScript 模組 -->
+<script src="app-core.js"></script>
+<script src="api-sync.js"></script>
+
+<!-- Service Worker (PWA) -->
 <script>
-// 狀態初始化
-const S = {
-  pin: localStorage.getItem('czg_pin') || '355218',
-  pinEnabled: localStorage.getItem('czg_pin_enabled') === '1',
-  buf: '',
-  gsId: localStorage.getItem('czg_gsid') || '1FUhXesSModk6yJmjZ34Jn2eklwmNJPpfKkAxrwefyS4',
-  gsKey: localStorage.getItem('czg_gskey') || '',
-  usdTwd: 32.5,
-  twStocks: JSON.parse(localStorage.getItem('czg_tw') || '[]'),
-  usStocks: JSON.parse(localStorage.getItem('czg_us') || '[]'),
-  fx: JSON.parse(localStorage.getItem('czg_fx') || '[]'),
-  crypto: JSON.parse(localStorage.getItem('czg_cr') || '[]'),
-  intl: JSON.parse(localStorage.getItem('czg_intl') || '[]'),
-  other: JSON.parse(localStorage.getItem('czg_oth') || '[]'),
-  emergency: JSON.parse(localStorage.getItem('czg_em') || '{"balance":0}'),
-  expenses: []
-};
-
-// 工具函式
-const fmt = n => Number(n).toLocaleString('zh-TW', {maximumFractionDigits: 2});
-const upcl = v => v >= 0 ? 'up' : 'dn';
-const saveL = () => {
-  localStorage.setItem('czg_tw', JSON.stringify(S.twStocks));
-  localStorage.setItem('czg_us', JSON.stringify(S.usStocks));
-  localStorage.setItem('czg_fx', JSON.stringify(S.fx));
-  localStorage.setItem('czg_cr', JSON.stringify(S.crypto));
-  localStorage.setItem('czg_intl', JSON.stringify(S.intl));
-  localStorage.setItem('czg_oth', JSON.stringify(S.other));
-  localStorage.setItem('czg_em', JSON.stringify(S.emergency));
-};
-
-// 股票自動補全字典
-const US_MAP = {'TSLA':'Tesla', 'AMD':'超微', 'AAPL':'Apple', 'GOOG':'Google', 'META':'Meta', 'INTC':'英特爾', 'NVDA':'輝達', 'MSFT':'微軟'};
-const INTL_MAP = {'122870.KQ':'YG', '041510.KQ':'SM', '035900.KQ':'JYP', '352820.KS':'HYBE', '142280.KQ':'CUBE'};
-
-function onUSCode(val) { const c=val.trim().toUpperCase(); if(US_MAP[c]) document.getElementById('i1').value=US_MAP[c]; }
-function onUSName(val) { const n=val.trim(); for(let k in US_MAP) if(US_MAP[k]===n) document.getElementById('i0').value=k; }
-function onIntlCode(val) { const c=val.trim().toUpperCase(); if(INTL_MAP[c]) document.getElementById('i1').value=INTL_MAP[c]; }
-function onIntlName(val) { const n=val.trim(); for(let k in INTL_MAP) if(INTL_MAP[k]===n) document.getElementById('i0').value=k; }
-
-// 啟動邏輯 (修復全黑Bug)
-document.addEventListener('DOMContentLoaded', () => {
-  if (S.pinEnabled) {
-    document.getElementById('lock').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-  } else {
-    document.getElementById('lock').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    initApp();
-  }
-  document.getElementById('gs-id').value = S.gsId;
-  document.getElementById('gs-key').value = S.gsKey;
-});
-
-function initApp() { renderAll(); doSync(); }
-
-// PIN 操作
-function pk(d) {
-  if (S.buf.length >= 6) return;
-  S.buf += String(d); updDots();
-  if (S.buf.length >= 4) {
-    if (S.buf === S.pin) {
-      document.getElementById('lock').style.display = 'none';
-      document.getElementById('app').style.display = 'flex';
-      initApp();
-    } else if (S.buf.length === 6) {
-      document.getElementById('perr').textContent = '密碼錯誤';
-      setTimeout(() => { S.buf = ''; updDots(); document.getElementById('perr').textContent = ''; }, 1000);
-    }
-  }
-}
-function pdel() { S.buf = S.buf.slice(0, -1); updDots(); }
-function updDots() {
-  const c = document.getElementById('pin-dots');
-  c.innerHTML = '';
-  for(let i=0; i<6; i++) {
-    c.innerHTML += `<div style="width:14px; height:14px; border-radius:50%; border:2px solid var(--gold); background:${i<S.buf.length?'var(--gold)':'transparent'}"></div>`;
-  }
-}
-
-// PIN 設定
-function savePin() {
-  const curr = document.getElementById('pin-curr').value;
-  const nw = document.getElementById('pin-new').value;
-  if(curr !== S.pin) { document.getElementById('pin-note').textContent = '目前密碼錯誤'; return; }
-  if(nw.length < 4) { document.getElementById('pin-note').textContent = '新密碼至少4碼'; return; }
-  S.pin = nw; localStorage.setItem('czg_pin', nw);
-  document.getElementById('pin-note').textContent = '密碼已更新';
-}
-function togglePin() {
-  S.pinEnabled = !S.pinEnabled;
-  localStorage.setItem('czg_pin_enabled', S.pinEnabled ? '1' : '0');
-  document.getElementById('pin-note').textContent = S.pinEnabled ? 'PIN 已啟用' : 'PIN 已停用';
-}
-
-// UI 導航
-function navTo(id, btn) {
-  document.querySelectorAll('.pane').forEach(p => p.classList.remove('on'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'));
-  document.getElementById('pane-' + id).classList.add('on');
-  btn.classList.add('on');
-}
-function openSP() { document.getElementById('settings-panel').classList.add('open'); document.getElementById('sp-ov').classList.add('open'); }
-function closeSP() { document.getElementById('settings-panel').classList.remove('open'); document.getElementById('sp-ov').classList.remove('open'); }
-
-// 彈窗
-let currT = '';
-function showM(type) {
-  currT = type;
-  const b = document.getElementById('m-body');
-  if (type==='tw') {
-    b.innerHTML = `<div class="fr"><label class="fl">股票代號</label><input class="fi" id="i0"></div><div class="fr"><label class="fl">名稱</label><input class="fi" id="i1"></div><div class="fr"><label class="fl">買入/賣出</label><select class="fi" id="act"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div class="fr"><label class="fl">股數</label><input class="fi" id="i2" type="number"></div><div class="fr"><label class="fl">成交價</label><input class="fi" id="i3" type="number"></div>`;
-  } else if (type==='us') {
-    b.innerHTML = `<div class="fr"><label class="fl">股票代號</label><input class="fi" id="i0" oninput="onUSCode(this.value)" style="text-transform:uppercase"></div><div class="fr"><label class="fl">名稱</label><input class="fi" id="i1" oninput="onUSName(this.value)"></div><div class="fr"><label class="fl">買入/賣出</label><select class="fi" id="act"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div class="fr"><label class="fl">股數</label><input class="fi" id="i2" type="number"></div><div class="fr"><label class="fl">成交價(台幣)</label><input class="fi" id="i3" type="number"></div>`;
-  } else if (type==='intl') {
-    b.innerHTML = `<div class="fr"><label class="fl">股票代號</label><input class="fi" id="i0" oninput="onIntlCode(this.value)" style="text-transform:uppercase"></div><div class="fr"><label class="fl">名稱</label><input class="fi" id="i1" oninput="onIntlName(this.value)"></div><div class="fr"><label class="fl">市場</label><input class="fi" id="mkt" value="韓股"></div><div class="fr"><label class="fl">買入/賣出</label><select class="fi" id="act"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div class="fr"><label class="fl">股數</label><input class="fi" id="i2" type="number"></div><div class="fr"><label class="fl">成交價(台幣)</label><input class="fi" id="i3" type="number"></div>`;
-  } else if (type==='fx') {
-    b.innerHTML = `<div class="fr"><label class="fl">幣別(如: KRW)</label><input class="fi" id="i0"></div><div class="fr"><label class="fl">買入/賣出</label><select class="fi" id="act"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div class="fr"><label class="fl">外幣數量</label><input class="fi" id="i1" type="number"></div><div class="fr"><label class="fl">買入匯率</label><input class="fi" id="i2" type="number" step="0.001"></div>`;
-  } else if (type==='crypto') {
-    b.innerHTML = `<div class="fr"><label class="fl">幣種(如: BTC)</label><input class="fi" id="i0"></div><div class="fr"><label class="fl">買入/賣出</label><select class="fi" id="act"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div class="fr"><label class="fl">數量</label><input class="fi" id="i1" type="number"></div><div class="fr"><label class="fl">總金額(台幣)</label><input class="fi" id="i2" type="number"></div>`;
-  } else if (type==='other') {
-    b.innerHTML = `<div class="fr"><label class="fl">資產名稱</label><input class="fi" id="i0"></div><div class="fr"><label class="fl">總價值(台幣)</label><input class="fi" id="i1" type="number"></div>`;
-  }
-  document.getElementById('modal-ov').classList.add('on');
-}
-function closeM() { document.getElementById('modal-ov').classList.remove('on'); }
-
-// 儲存資料
-function saveM() {
-  const gv = id => document.getElementById(id) ? document.getElementById(id).value : '';
-  const act = gv('act');
-  if (currT==='tw') {
-    const code=gv('i0'), name=gv('i1'), sh=parseFloat(gv('i2'))||0, pr=parseFloat(gv('i3'))||0;
-    let ex = S.twStocks.find(x=>x.code===code);
-    if(act==='buy') {
-      if(ex) { ex.cost = (ex.shares*ex.cost + sh*pr)/(ex.shares+sh); ex.shares+=sh; }
-      else S.twStocks.push({code, name, shares:sh, cost:pr, livePrice:null, realPnl:0});
-    } else if(ex) { ex.shares -= sh; if(ex.shares<=0) S.twStocks = S.twStocks.filter(x=>x.code!==code); }
-  } else if (currT==='us') {
-    const ticker=gv('i0'), name=gv('i1'), sh=parseFloat(gv('i2'))||0, pr=parseFloat(gv('i3'))||0;
-    let ex = S.usStocks.find(x=>x.ticker===ticker);
-    if(act==='buy') {
-      if(ex) { ex.costTwd = (ex.shares*ex.costTwd + sh*pr)/(ex.shares+sh); ex.shares+=sh; }
-      else S.usStocks.push({ticker, name, shares:sh, costTwd:pr, livePriceUsd:null});
-    } else if(ex) { ex.shares -= sh; if(ex.shares<=0) S.usStocks = S.usStocks.filter(x=>x.ticker!==ticker); }
-  } else if (currT==='intl') {
-    const code=gv('i0'), name=gv('i1'), mkt=gv('mkt'), sh=parseFloat(gv('i2'))||0, pr=parseFloat(gv('i3'))||0;
-    let ex = S.intl.find(x=>x.code===code);
-    if(act==='buy') {
-      if(ex) { ex.costTwd = (ex.shares*ex.costTwd + sh*pr)/(ex.shares+sh); ex.shares+=sh; }
-      else S.intl.push({code, name, mkt, shares:sh, costTwd:pr, priceTwd:null});
-    } else if(ex) { ex.shares -= sh; if(ex.shares<=0) S.intl = S.intl.filter(x=>x.code!==code); }
-  } else if (currT==='fx') {
-    const cur=gv('i0').toUpperCase(), amt=parseFloat(gv('i1'))||0, rt=parseFloat(gv('i2'))||0;
-    let ex = S.fx.find(x=>x.cur===cur);
-    if(act==='buy') {
-      if(ex) { ex.amt += amt; } else S.fx.push({cur, amt, rateBuy:rt, rateLive:null});
-    } else if(ex) { ex.amt -= amt; if(ex.amt<=0) S.fx = S.fx.filter(x=>x.cur!==cur); }
-  } else if (currT==='crypto') {
-    const coin=gv('i0').toUpperCase(), amt=parseFloat(gv('i1'))||0, tot=parseFloat(gv('i2'))||0;
-    let ex = S.crypto.find(x=>x.coin===coin);
-    if(act==='buy') {
-      if(ex) { ex.costPer = (ex.amt*ex.costPer + tot)/(ex.amt+amt); ex.amt+=amt; }
-      else S.crypto.push({coin, amt, costPer:tot/amt, priceTwd:null});
-    } else if(ex) { ex.amt -= amt; if(ex.amt<=0) S.crypto = S.crypto.filter(x=>x.coin!==coin); }
-  } else if (currT==='other') {
-    S.other.push({name:gv('i0'), val:parseFloat(gv('i1'))||0});
-  }
-  saveL(); renderAll(); closeM();
-}
-
-function emAdjust(act) {
-  const amt = parseFloat(document.getElementById('em-input').value) || 0;
-  if(amt<=0) return;
-  if(act==='add') S.emergency.balance += amt;
-  else S.emergency.balance = Math.max(0, S.emergency.balance - amt);
-  saveL(); renderAll();
-  document.getElementById('em-input').value='';
-}
-
-// 資產數據校正 (從Google Sheets直接同步股數)
-async function syncCorrection() {
-  const gid = '2078256663'; // 戶部尚書資料校正
-  try {
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${S.gsId}/gviz/tq?tqx=out:csv&gid=${gid}`);
-    const text = await res.text();
-    const rows = text.split('\n').map(r => r.split(',').map(c => c.replace(/(^"|"$)/g, '').trim()));
-    
-    for(let i=1; i<rows.length; i++) {
-      const r = rows[i];
-      for(let j=0; j<r.length; j+=2) {
-        const code = r[j]; const val = r[j+1];
-        if(code && val) {
-          const amt = parseFloat(val);
-          if(isNaN(amt)) continue;
-          
-          let found = false;
-          S.twStocks.forEach(s => { if(s.code===code || s.name===code) { s.shares = amt; found=true; } }); if(found) continue;
-          S.usStocks.forEach(s => { if(s.ticker===code || s.name===code) { s.shares = amt; found=true; } }); if(found) continue;
-          S.intl.forEach(s => { if(s.code===code || s.name===code) { s.shares = amt; found=true; } }); if(found) continue;
-          S.fx.forEach(s => { if(s.cur===code) { s.amt = amt; found=true; } }); if(found) continue;
-          S.crypto.forEach(s => { if(s.coin===code) { s.amt = amt; found=true; } }); if(found) continue;
-          if(code === '備用金') S.emergency.balance = amt;
-        }
-      }
-    }
-    saveL(); renderAll();
-    alert('校正成功！已更新最新數量。');
-  } catch(e) {
-    alert('同步失敗：' + e.message);
-  }
-}
-
-// Google Sheets 同步匯率與現價
-async function doSync() {
-  if(!S.gsId) return;
-  try {
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${S.gsId}/gviz/tq?tqx=out:csv&gid=102108546`);
-    const text = await res.text();
-    const rows = text.split('\n').map(r => r.split(',').map(c => c.replace(/(^"|"$)/g, '').trim()));
-    
-    const getVal = (col, row) => parseFloat(rows[row-1]?.[col.charCodeAt(0)-65]) || null;
-    
-    S.usdTwd = getVal('F', 2) || 32.5; // USDTWD
-    
-    // 更新匯率
-    S.fx.forEach(f => {
-      if(f.cur==='KRW') f.rateLive = getVal('F', 4);
-      if(f.cur==='JPY') f.rateLive = getVal('F', 3);
-      if(f.cur==='CNY') f.rateLive = getVal('F', 5);
-      if(f.cur==='THB') f.rateLive = getVal('F', 8);
-    });
-
-    saveL(); renderAll();
-  } catch(e) { console.log("Sync Error", e); }
-}
-
-// 畫面渲染
-let pieChart = null;
-function renderAll() {
-  let twV=0, usV=0, intlV=0, fxV=0, crV=0, othV=0, emV=S.emergency.balance;
-
-  // 台股
-  document.getElementById('tw-body').innerHTML = S.twStocks.map(s => {
-    let p = s.livePrice || s.cost; let v = p * s.shares; twV += v;
-    let pnl = v - (s.cost * s.shares);
-    return `<tr><td>${s.name}</td><td>${s.shares}</td><td>${p}</td><td>${fmt(v)}</td><td class="${upcl(pnl)}">${fmt(pnl)}</td></tr>`;
-  }).join('');
-  document.getElementById('tw-val').textContent = `NT$ ${fmt(twV)}`;
-
-  // 美股
-  document.getElementById('us-body').innerHTML = S.usStocks.map(s => {
-    let p = s.livePriceUsd ? (s.livePriceUsd * S.usdTwd) : s.costTwd; let v = p * s.shares; usV += v;
-    let pnl = v - (s.costTwd * s.shares);
-    return `<tr><td>${s.name}</td><td>${s.shares}</td><td>${fmt(p)}</td><td>${fmt(v)}</td><td class="${upcl(pnl)}">${fmt(pnl)}</td></tr>`;
-  }).join('');
-  document.getElementById('us-val').textContent = `NT$ ${fmt(usV)}`;
-
-  // 他國
-  document.getElementById('intl-body').innerHTML = S.intl.map(s => {
-    let p = s.priceTwd || s.costTwd; let v = p * s.shares; intlV += v;
-    return `<tr><td>${s.name}</td><td>${s.mkt}</td><td>${s.shares}</td><td>${fmt(v)}</td></tr>`;
-  }).join('');
-  document.getElementById('intl-val').textContent = `NT$ ${fmt(intlV)}`;
-
-  // 外幣
-  document.getElementById('fx-body').innerHTML = S.fx.map(s => {
-    let r = s.rateLive || s.rateBuy; let v = s.amt * r; fxV += v;
-    return `<tr><td>${s.cur}</td><td>${s.amt}</td><td>${r}</td><td>${fmt(v)}</td></tr>`;
-  }).join('');
-  document.getElementById('fx-val').textContent = `NT$ ${fmt(fxV)}`;
-
-  // 加密
-  document.getElementById('cr-body').innerHTML = S.crypto.map(s => {
-    let p = s.priceTwd || s.costPer; let v = s.amt * p; crV += v;
-    return `<tr><td>${s.coin}</td><td>${s.amt}</td><td>${fmt(p)}</td><td>${fmt(v)}</td></tr>`;
-  }).join('');
-  document.getElementById('cr-val').textContent = `NT$ ${fmt(crV)}`;
-
-  // 其他 & 備用金
-  document.getElementById('oth-body').innerHTML = S.other.map(s => { othV += s.val; return `<tr><td>${s.name}</td><td style="text-align:right">${fmt(s.val)}</td></tr>`; }).join('');
-  document.getElementById('oth-val').textContent = `NT$ ${fmt(othV)}`;
-  document.getElementById('em-bal').textContent = `NT$ ${fmt(emV)}`;
-
-  // 總計 & 圓餅圖
-  let tot = twV + usV + intlV + fxV + crV + othV + emV;
-  document.getElementById('b-amt').textContent = `NT$ ${fmt(tot)}`;
-  document.getElementById('stk-tot').textContent = `NT$ ${fmt(twV + usV + intlV)}`;
-
-  const ctx = document.getElementById('dc');
-  if(ctx && tot > 0) {
-    if(pieChart) pieChart.destroy();
-    pieChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['台股','美股','他國','外幣','加密','備用金','其他'],
-        datasets: [{ data: [twV, usV, intlV, fxV, crV, emV, othV], backgroundColor: ['#C8962A','#2ECC71','#3498DB','#E74C3C','#9B59B6','#F1C40F','#95A5A6'], borderWidth: 0 }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels:{color:'#A0A0A0', font:{size:10}} } } }
-    });
-  }
+if('serviceWorker' in navigator){
+  const sw=`self.addEventListener('install',e=>e.waitUntil(self.skipWaiting()));self.addEventListener('activate',e=>e.waitUntil(clients.claim()));self.addEventListener('fetch',e=>{if(e.request.url.includes('sheets.googleapis.com')||e.request.url.includes('fonts.googleapis.com')){e.respondWith(fetch(e.request).catch(()=>new Response('',{status:503})));}});`;
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'application/javascript'}))).catch(()=>{});
 }
 </script>
 </body>
